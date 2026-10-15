@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XLedger • Dashboard Operacional 4 Quadrantes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(30, 41, 67, 0.85);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #8b5cf6;
+      --glass-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.10) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden; /* VIEWPORT LOCK: Sem rolagem vertical */
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: 58px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(10, 15, 28, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-tag {
+      font-size: 11px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+    }
+
+    .status-pulse {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-emerald);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    /* GRID 4 QUADRANTES VIEWPORT LOCKED */
+    main {
+      flex: 1;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 16px;
+      height: calc(100vh - 58px);
+    }
+
+    .quadrant-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(14px);
+      box-shadow: var(--glass-glow);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .quadrant-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .quadrant-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .quadrant-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .q-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .q1 .q-badge { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); }
+    .q2 .q-badge { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+    .q3 .q-badge { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); }
+    .q4 .q-badge { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); }
+
+    .metric-hero {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-data {
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* BARRAS E GAUGES */
+    .bar-container {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      margin: 10px 0;
+    }
+
+    .bar-segment-jev {
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+      transition: width 0.6s ease;
+    }
+
+    .bar-segment-rag {
+      background: linear-gradient(90deg, var(--accent-amber), var(--accent-rose));
+      transition: width 0.6s ease;
+    }
+
+    .gauge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pill-green { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pill-red { background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+    .pill-amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    .bottom-tagline {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-logo">XL</div>
+      <div class="brand-title">XLedger Financial Engine</div>
+      <div class="brand-tag">JEV System 1 + RAG System 2</div>
+    </div>
+    <div class="header-status">
+      <div class="status-pulse">
+        <span class="pulse-dot"></span>
+        <span>SSE STREAM ATIVO</span>
+      </div>
+      <span style="color: var(--text-muted);">RFB e-Financeira / IRPF / CFC</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Q1: LIQUIDEZ E FLUXO DE CAIXA -->
+    <div class="quadrant-card q1">
+      <div>
+        <div class="quadrant-header">
+          <div class="quadrant-title">
+            <span class="q-badge">Q1</span>
+            <span>Liquidez & Fluxo de Caixa</span>
+          </div>
+          <span class="gauge-pill pill-green" id="q1-status">RUNWAY 6.3M</span>
+        </div>
+        <div class="metric-hero">
+          <span class="metric-value" style="color: var(--accent-emerald);" id="q1-saldo">R$ 428.910,00</span>
+          <span class="metric-sub">Saldo Operacional Líquido</span>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-item">
+          <span class="metric-label">Total Entradas</span>
+          <span class="metric-data" style="color: var(--accent-emerald);" id="q1-entradas">R$ 650.000,00</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Total Saídas</span>
+          <span class="metric-data" style="color: var(--accent-rose);" id="q1-saidas">R$ 221.090,00</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Burn Rate Mensal</span>
+          <span class="metric-data" id="q1-burn">R$ 68.080,00</span>
+        </div>
+      </div>
+      <div class="bottom-tagline">
+        <span>Previsão de Caixa DFC Direto</span>
+        <span>Conexão Open Finance & Extrato</span>
+      </div>
+    </div>
+
+    <!-- Q2: EFICIÊNCIA IA (JEV VS RAG) -->
+    <div class="quadrant-card q2">
+      <div>
+        <div class="quadrant-header">
+          <div class="quadrant-title">
+            <span class="q-badge">Q2</span>
+            <span>Eficiência IA (Jev vs RAG)</span>
+          </div>
+          <span class="gauge-pill pill-green" id="q2-latencia">&lt; 185ms MÉDIA</span>
+        </div>
+        <div class="metric-hero">
+          <span class="metric-value" style="color: var(--accent-cyan);" id="q2-autoclass">91.4%</span>
+          <span class="metric-sub">Autoclassificação Determinística (Jev)</span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-segment-jev" id="q2-bar-jev" style="width: 91.4%;"></div>
+          <div class="bar-segment-rag" id="q2-bar-rag" style="width: 8.6%;"></div>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-item">
+          <span class="metric-label">JEV Fast-Track</span>
+          <span class="metric-data" id="q2-count-jev">420 tx</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Desvios RAG</span>
+          <span class="metric-data" style="color: var(--accent-amber);" id="q2-count-rag">40 tx</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Pendências</span>
+          <span class="metric-data" id="q2-pendencias">0</span>
+        </div>
+      </div>
+      <div class="bottom-tagline">
+        <span>Triagem: Score &gt;= 0.90 consolidado imediatamente</span>
+        <span>OpenRouter typesafe/jev-latest</span>
+      </div>
+    </div>
+
+    <!-- Q3: TERMÔMETRO FISCAL (CNPJ -> CPF) -->
+    <div class="quadrant-card q3">
+      <div>
+        <div class="quadrant-header">
+          <div class="quadrant-title">
+            <span class="q-badge">Q3</span>
+            <span>Termômetro Fiscal (CNPJ ➔ CPF)</span>
+          </div>
+          <span class="gauge-pill pill-amber" id="q3-alerta-badge">AUDITORIA ATIVA</span>
+        </div>
+        <div class="metric-hero">
+          <span class="metric-value" style="color: var(--accent-rose);" id="q3-repasses">R$ 65.000,00</span>
+          <span class="metric-sub">Repasses a Sócios / CPFs no Mês</span>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-item">
+          <span class="metric-label">Teto e-Financeira (15k)</span>
+          <span class="metric-data" style="color: var(--accent-rose);" id="q3-efinanceira">82.6% atingido</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">IRRF Retido 10% (&gt;50k)</span>
+          <span class="metric-data" style="color: var(--accent-amber);" id="q3-irrf">R$ 1.500,00</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Confusão Patrimonial</span>
+          <span class="metric-data" id="q3-confusao">0 detectadas</span>
+        </div>
+      </div>
+      <div class="bottom-tagline">
+        <span>IN RFB 1571/2015 &amp; Lei 4.357/64 Art. 32</span>
+        <span>Blindagem Jurídica Art. 50 CC</span>
+      </div>
+    </div>
+
+    <!-- Q4: DRE DINÂMICA & EVOLUÇÃO CONTÁBIL -->
+    <div class="quadrant-card q4">
+      <div>
+        <div class="quadrant-header">
+          <div class="quadrant-title">
+            <span class="q-badge">Q4</span>
+            <span>DRE Dinâmica &amp; Auditoria</span>
+          </div>
+          <span class="gauge-pill pill-green" id="q4-margem-badge">MARGEM 57.8%</span>
+        </div>
+        <div class="metric-hero">
+          <span class="metric-value" style="color: var(--accent-amber);" id="q4-lucro">R$ 375.800,00</span>
+          <span class="metric-sub">Lucro Líquido Contábil Projetado</span>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-item">
+          <span class="metric-label">Receita Bruta</span>
+          <span class="metric-data" id="q4-receita">R$ 650.000,00</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Desp. Dedutíveis</span>
+          <span class="metric-data" style="color: var(--accent-emerald);" id="q4-dedutiveis">R$ 215.000,00</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Desp. Indedutíveis</span>
+          <span class="metric-data" style="color: var(--accent-rose);" id="q4-indedutiveis">R$ 6.090,00</span>
+        </div>
+      </div>
+      <div class="bottom-tagline">
+        <span>Partidas Dobradas e Plano de Contas SPED</span>
+        <span>Demonstração de Resultado Sintética</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Conexão SSE para reatividade contínua em tempo real
+    function connectSSE() {
+      const evtSource = new EventSource("/api/stream/metrics");
+      evtSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          updateDashboard(data);
+        } catch (e) {
+          console.error("Erro ao processar SSE:", e);
+        }
+      };
+      evtSource.onerror = function() {
+        console.warn("Reconectando SSE em 3s...");
+        evtSource.close();
+        setTimeout(connectSSE, 3000);
+      };
+    }
+
+    function updateDashboard(data) {
+      if (!data) return;
+      const q1 = data.quadrante_1_fluxo_caixa || {};
+      const q2 = data.quadrante_2_eficiencia_ia || {};
+      const q3 = data.quadrante_3_termometro_fiscal || {};
+      const q4 = data.quadrante_4_dre_dinamica || {};
+
+      if (q1.saldo_liquido !== undefined) {
+        document.getElementById("q1-saldo").textContent = "R$ " + q1.saldo_liquido.toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q1-entradas").textContent = "R$ " + (q1.total_entradas || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q1-saidas").textContent = "R$ " + (q1.total_saidas || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q1-burn").textContent = "R$ " + (q1.burn_rate_mensal || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q1-status").textContent = "RUNWAY " + (q1.runway_projetado_meses || 0) + "M";
+      }
+
+      if (q2.taxa_automacao_jev !== undefined) {
+        document.getElementById("q2-autoclass").textContent = q2.taxa_automacao_jev + "%";
+        document.getElementById("q2-bar-jev").style.width = q2.taxa_automacao_jev + "%";
+        document.getElementById("q2-bar-rag").style.width = q2.taxa_recorrencia_rag + "%";
+        document.getElementById("q2-count-jev").textContent = (q2.total_jev || 0) + " tx";
+        document.getElementById("q2-count-rag").textContent = (q2.total_rag || 0) + " tx";
+      }
+
+      if (q3.volume_total_pj_para_cpf !== undefined) {
+        document.getElementById("q3-repasses").textContent = "R$ " + q3.volume_total_pj_para_cpf.toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q3-efinanceira").textContent = (q3.percentual_teto_efinanceira || 0) + "% atingido";
+        document.getElementById("q3-irrf").textContent = "R$ " + (q3.total_irrf_provisionado || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q3-confusao").textContent = (q3.alertas_confusao_patrimonial || 0) + " detectadas";
+      }
+
+      if (q4.lucro_liquido_contabil !== undefined) {
+        document.getElementById("q4-lucro").textContent = "R$ " + q4.lucro_liquido_contabil.toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q4-receita").textContent = "R$ " + (q4.receita_bruta || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q4-dedutiveis").textContent = "R$ " + (q4.despesas_dedutiveis || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q4-indedutiveis").textContent = "R$ " + (q4.despesas_indedutiveis || 0).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+        document.getElementById("q4-margem-badge").textContent = "MARGEM " + (q4.margem_liquida_pct || 0) + "%";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", connectSSE);
+  </style>
+</body>
+</html>
