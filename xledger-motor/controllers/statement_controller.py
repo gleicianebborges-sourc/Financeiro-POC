@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
+# pyrefly: ignore [missing-import]
 from models.statement import BankStatement
 from models.transaction import BankStatementTransaction, ProcessedTransaction
 from models.schemas.transaction import TransactionClassificationOutput
