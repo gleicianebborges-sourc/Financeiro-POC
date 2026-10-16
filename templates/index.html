@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XLedger • Motor Contábil & Fiscal | Dashboard OAS 3.1</title>
+  
+  <!-- Google Fonts: Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN Oficial -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              cyan: '#06b6d4',
+              blue: '#3b82f6',
+              purple: '#8b5cf6',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              rose: '#f43f5e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Viewport Lock estrito */
+    body {
+      font-family: 'Outfit', sans-serif;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Efeito de brilho neon sutil */
+    .glow-cyan {
+      box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+    }
+    .glow-rose {
+      box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+    }
+    /* Estilização da barra de rolagem do log de terminal */
+    .terminal-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .terminal-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- CABEÇALHO COMPACTO SUPERIOR COM UPLOAD INLINE                             -->
+  <!-- ========================================================================= -->
+  <header class="h-14 px-6 flex items-center justify-between border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md z-20 flex-shrink-0">
+    
+    <!-- Branding & Badges -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white text-base shadow-lg shadow-cyan-500/20">
+        XL
+      </div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-sm font-bold tracking-wide text-white uppercase flex items-center gap-2">
+          XLedger
+          <span class="text-slate-500 text-xs font-normal">| Motor Contábil & Fiscal</span>
+        </h1>
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+          v1.0.0
+        </span>
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-950 text-purple-400 border border-purple-800/60">
+          OAS 3.1
+        </span>
+      </div>
+    </div>
+
+    <!-- Indicador SSE e Formulário Inline de Ingestão -->
+    <div class="flex items-center gap-4">
+      
+      <!-- Status SSE -->
+      <div id="sse-badge" class="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono bg-slate-800/80 border border-slate-700/60 text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="sse-dot"></span>
+        <span id="sse-status-text">SSE: Conectando...</span>
+      </div>
+
+      <!-- Formulário Inline de Upload Multipart/Form-Data -->
+      <form id="upload-form" class="flex items-center gap-2 bg-slate-800/60 p-1 pl-3 rounded-lg border border-slate-700/60">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <label for="statement-file" class="cursor-pointer text-xs text-slate-300 hover:text-white truncate max-w-[140px]" id="file-label">
+            Escolher .OFX/.CSV
+          </label>
+          <input type="file" id="statement-file" name="file" accept=".ofx,.csv" class="hidden">
+        </div>
+
+        <button type="submit" id="btn-submit" class="px-3 py-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-medium rounded-md transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50">
+          <span>Ingerir</span>
+          <svg id="btn-spinner" class="hidden animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </button>
+      </form>
+
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- PAINEL CENTRAL: 4 QUADRANTES OPERACIONAIS EM CSS GRID                     -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 grid grid-cols-2 grid-rows-2 gap-4 p-4 min-h-0 overflow-hidden">
+    
+    <!-- ======================================================================= -->
+    <!-- QUADRANTE 1: FLUXO DE CAIXA VALIDADO                                    -->
+    <!-- ======================================================================= -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-all glow-cyan">
+      <div class="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Header do Quadrante -->
+      <div class="flex items-center justify-between border-b border-slate-800/60 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400">Q1 • Fluxo de Caixa Validado</h2>
+        </div>
+        <span id="q1-status" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+          SAUDÁVEL
+        </span>
+      </div>
+
+      <!-- Métricas Principais -->
+      <div class="my-auto py-2">
+        <p class="text-xs text-slate-400 uppercase tracking-wider font-medium">Saldo Líquido Operacional</p>
+        <div class="flex items-baseline gap-2 mt-1">
+          <span class="text-3xl lg:text-4xl font-extrabold tracking-tight text-white font-mono" id="q1-saldo">
+            R$ 0,00
+          </span>
+          <span class="text-xs text-slate-400 font-mono">BRL</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5 font-mono">
+          <span>Runway estimado:</span>
+          <span id="q1-runway" class="text-cyan-300 font-bold">5.8 meses</span>
+        </p>
+      </div>
+
+      <!-- Cards de Entradas e Saídas -->
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50 flex flex-col">
+          <span class="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Entradas Fiscais
+          </span>
+          <span class="text-sm lg:text-base font-bold text-emerald-400 font-mono mt-1" id="q1-entradas">
+            R$ 0,00
+          </span>
+        </div>
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50 flex flex-col">
+          <span class="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+            Saídas Mapeadas
+          </span>
+          <span class="text-sm lg:text-base font-bold text-rose-400 font-mono mt-1" id="q1-saidas">
+            R$ 0,00
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- QUADRANTE 2: MONITORAMENTO DE LIMITES FISCAIS (CNPJ ➔ CPF)              -->
+    <!-- ======================================================================= -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-all">
+      <div class="absolute -right-8 -top-8 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Header do Quadrante -->
+      <div class="flex items-center justify-between border-b border-slate-800/60 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-amber-400">Q2 • Monitoramento Limites Fiscais (CNPJ ➔ CPF)</h2>
+        </div>
+        <span id="q2-status-risco" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800/60">
+          ATENÇÃO
+        </span>
+      </div>
+
+      <!-- Barra de Progresso e Métricas -->
+      <div class="my-auto py-2">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs text-slate-300 font-medium">Volume Acumulado Mensal (Sócios/PF)</span>
+          <span class="text-xs font-bold text-amber-300 font-mono" id="q2-percentual">0.0%</span>
+        </div>
+        
+        <!-- Barra Visual Dinâmica -->
+        <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
+          <div id="q2-progress-bar" class="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-rose-500 rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+        </div>
+
+        <div class="flex items-center justify-between mt-2 text-[11px] text-slate-400 font-mono">
+          <span>Repassado: <b class="text-white font-mono" id="q2-volume">R$ 0,00</b></span>
+          <span>Teto Isenção: <b class="text-slate-300">R$ 50.000,00</b></span>
+        </div>
+      </div>
+
+      <!-- Grid com Alertas e-Financeira & IRRF -->
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-slate-400 uppercase font-semibold">e-Financeira (IN 1571)</span>
+            <span id="q2-badge-efin" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          </div>
+          <p class="text-xs text-slate-200 font-mono mt-1" id="q2-desc-efin">Teto: R$ 5k PF / R$ 15k PJ</p>
+        </div>
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
+          <span class="text-[10px] text-slate-400 uppercase font-semibold">IRRF Retido (10% Exced.)</span>
+          <p class="text-sm lg:text-base font-bold text-amber-400 font-mono mt-0.5" id="q2-irrf-retido">R$ 0,00</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- QUADRANTE 3: PREVENÇÃO DE CONFUSÃO PATRIMONIAL (ART. 50 CC)            -->
+    <!-- ======================================================================= -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-all glow-rose">
+      <div class="absolute -right-8 -top-8 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Header do Quadrante -->
+      <div class="flex items-center justify-between border-b border-slate-800/60 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-rose-500"></div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-rose-400">Q3 • Prevenção de Confusão Patrimonial</h2>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-950/80 text-rose-300 border border-rose-800/50">
+          Art. 50 Código Civil
+        </span>
+      </div>
+
+      <!-- Contadores Visuais Destacados -->
+      <div class="grid grid-cols-2 gap-3 my-auto py-2">
+        <!-- Bloqueios Críticos -->
+        <div class="bg-slate-950/80 p-3 rounded-lg border border-rose-900/40 flex flex-col items-center justify-center text-center">
+          <span class="text-3xl lg:text-4xl font-extrabold text-rose-500 font-mono tracking-tight" id="q3-bloqueios">
+            0
+          </span>
+          <span class="text-xs text-rose-300 font-semibold uppercase mt-1">Bloqueios Críticos</span>
+          <span class="text-[10px] text-slate-500 mt-0.5">Glosas e Adiantamentos</span>
+        </div>
+
+        <!-- Suspeitas Auditadas -->
+        <div class="bg-slate-950/80 p-3 rounded-lg border border-amber-900/40 flex flex-col items-center justify-center text-center">
+          <span class="text-3xl lg:text-4xl font-extrabold text-amber-400 font-mono tracking-tight" id="q3-suspeitas">
+            0
+          </span>
+          <span class="text-xs text-amber-300 font-semibold uppercase mt-1">Suspeitas Auditadas</span>
+          <span class="text-[10px] text-slate-500 mt-0.5">Despesas Pessoais Sócio</span>
+        </div>
+      </div>
+
+      <!-- Rodapé do Card com Total Glosado -->
+      <div class="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs">
+        <span class="text-slate-400 font-mono">Total Isolado (Mútuo Sócio):</span>
+        <span class="font-bold text-rose-400 font-mono text-sm" id="q3-total-glosado">R$ 0,00</span>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- QUADRANTE 4: MÉTRICAS DO PIPELINE PICOCLAW (JEV VS RAG)                 -->
+    <!-- ======================================================================= -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-all glow-emerald">
+      <div class="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Header do Quadrante -->
+      <div class="flex items-center justify-between border-b border-slate-800/60 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-purple-400"></div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-purple-400">Q4 • Métricas do Pipeline PicoClaw</h2>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-950 text-purple-300 border border-purple-800/60">
+          JEV System 1 + RAG System 2
+        </span>
+      </div>
+
+      <!-- Comparativo de Eficiência JEV vs RAG -->
+      <div class="my-auto py-2 flex flex-col gap-2">
+        <div class="flex items-center justify-between text-xs font-mono">
+          <span class="text-cyan-400 font-bold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-sm bg-cyan-400"></span>
+            JEV Fast-Track (&lt;250ms): <span id="q4-taxa-jev">0%</span>
+          </span>
+          <span class="text-purple-400 font-bold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-sm bg-purple-400"></span>
+            RAG Vetorial: <span id="q4-taxa-rag">0%</span>
+          </span>
+        </div>
+
+        <!-- Barra Comparativa Bicolor -->
+        <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800 flex">
+          <div id="q4-bar-jev" class="h-full bg-cyan-400 rounded-l-full transition-all duration-700" style="width: 50%"></div>
+          <div id="q4-bar-rag" class="h-full bg-purple-500 rounded-r-full transition-all duration-700" style="width: 50%"></div>
+        </div>
+      </div>
+
+      <!-- Detalhes de Latência e Volume -->
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
+          <span class="text-[10px] text-slate-400 uppercase font-semibold">Latência Média JEV</span>
+          <p class="text-sm lg:text-base font-bold text-cyan-400 font-mono mt-0.5" id="q4-latencia">0 ms</p>
+        </div>
+        <div class="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
+          <span class="text-[10px] text-slate-400 uppercase font-semibold">Transações Processadas</span>
+          <p class="text-sm lg:text-base font-bold text-white font-mono mt-0.5" id="q4-total-tx">0</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- RODAPÉ: BARRA DE STATUS / TERMINAL DE LOGS MONOESPAÇADA                   -->
+  <!-- ========================================================================= -->
+  <footer class="h-16 px-6 py-2 bg-slate-950 border-t border-slate-800/90 flex items-center justify-between font-mono text-xs z-20 flex-shrink-0">
+    <div class="flex items-center gap-3 overflow-hidden w-full">
+      <div class="flex items-center gap-2 text-cyan-400 flex-shrink-0 font-bold">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+        <span>EVENT_LOG:</span>
+      </div>
+      <div id="terminal-feed" class="text-slate-400 truncate flex-1 text-[11px]">
+        [BOOT] Inicializando subsistema XLedger e aguardando eventos do pipeline...
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4 text-slate-500 text-[10px] flex-shrink-0">
+      <span id="footer-clock">00:00:00</span>
+      <span>•</span>
+      <span>PicoClaw Motor V1</span>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT VANILLA: FETCH INICIAL, SSE EVENTSOURCE E UPLOAD ASSÍNCRONO    -->
+  <!-- ========================================================================= -->
+  <script>
+    // Utilitário de formatação em Real Brasileiro (BRL)
+    const formatBRL = (value) => {
+      const num = Number(value) || 0;
+      return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    };
+
+    // Atualiza relógio do rodapé
+    const updateClock = () => {
+      const now = new Date();
+      document.getElementById('footer-clock').textContent = now.toLocaleTimeString('pt-BR');
+    };
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Logger no rodapé
+    const logEvent = (msg, type = 'info') => {
+      const feed = document.getElementById('terminal-feed');
+      const time = new Date().toLocaleTimeString('pt-BR');
+      let prefix = `[${time}] `;
+      if (type === 'success') prefix += '✅ ';
+      else if (type === 'error') prefix += '❌ ';
+      else if (type === 'stream') prefix += '⚡ ';
+      else prefix += 'ℹ️ ';
+      feed.innerHTML = `<span class="${type === 'error' ? 'text-rose-400 font-bold' : type === 'success' ? 'text-emerald-400 font-bold' : 'text-slate-300'}">${prefix}${msg}</span>`;
+    };
+
+    // =========================================================================
+    // 1. ATUALIZAÇÃO DOS 4 QUADRANTES COM DADOS
+    // =========================================================================
+    const applyDashboardData = (data) => {
+      if (!data) return;
+
+      // Q1: Fluxo de Caixa
+      if (data.fluxo_caixa) {
+        document.getElementById('q1-saldo').textContent = formatBRL(data.fluxo_caixa.saldo_atual);
+        document.getElementById('q1-entradas').textContent = formatBRL(data.fluxo_caixa.entradas_fiscais);
+        document.getElementById('q1-saidas').textContent = formatBRL(data.fluxo_caixa.saidas_mapeadas);
+        if (data.fluxo_caixa.status) document.getElementById('q1-status').textContent = data.fluxo_caixa.status;
+        if (data.fluxo_caixa.runway_meses) document.getElementById('q1-runway').textContent = `${data.fluxo_caixa.runway_meses} meses`;
+      }
+
+      // Q2: Limites CNPJ ➔ CPF
+      if (data.limites_cnpj_cpf) {
+        const perc = Number(data.limites_cnpj_cpf.percentual_atingido) || 0;
+        document.getElementById('q2-percentual').textContent = `${perc.toFixed(1)}%`;
+        document.getElementById('q2-progress-bar').style.width = `${Math.min(perc, 100)}%`;
+        document.getElementById('q2-volume').textContent = formatBRL(data.limites_cnpj_cpf.volume_transferido);
+        document.getElementById('q2-irrf-retido').textContent = formatBRL(data.limites_cnpj_cpf.total_irrf_retido);
+        if (data.limites_cnpj_cpf.status_risco) {
+          document.getElementById('q2-status-risco').textContent = data.limites_cnpj_cpf.status_risco;
+        }
+
+        const dot = document.getElementById('q2-badge-efin');
+        if (data.limites_cnpj_cpf.alerta_efinanceira) {
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+          document.getElementById('q2-desc-efin').textContent = 'ALERTA: Teto e-Financeira Atingido';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          document.getElementById('q2-desc-efin').textContent = 'Monitorado: < R$ 5k PF / R$ 15k PJ';
+        }
+      }
+
+      // Q3: Confusão Patrimonial
+      if (data.confusao_patrimonial) {
+        document.getElementById('q3-bloqueios').textContent = data.confusao_patrimonial.bloqueios_criticos ?? 0;
+        document.getElementById('q3-suspeitas').textContent = data.confusao_patrimonial.suspeitas_auditadas ?? 0;
+        document.getElementById('q3-total-glosado').textContent = formatBRL(data.confusao_patrimonial.total_glosado);
+      }
+
+      // Q4: Eficiência Pipeline PicoClaw
+      if (data.eficiencia_pipeline) {
+        const taxaJev = Number(data.eficiencia_pipeline.taxa_jev) || 0;
+        const taxaRag = Number(data.eficiencia_pipeline.taxa_rag) || 0;
+        document.getElementById('q4-taxa-jev').textContent = `${taxaJev.toFixed(1)}%`;
+        document.getElementById('q4-taxa-rag').textContent = `${taxaRag.toFixed(1)}%`;
+        document.getElementById('q4-bar-jev').style.width = `${taxaJev}%`;
+        document.getElementById('q4-bar-rag').style.width = `${taxaRag}%`;
+        document.getElementById('q4-latencia').textContent = `${data.eficiencia_pipeline.latencia_media_ms ?? 0} ms`;
+        document.getElementById('q4-total-tx').textContent = Number(data.eficiencia_pipeline.total_processadas ?? 0).toLocaleString('pt-BR');
+      }
+    };
+
+    // =========================================================================
+    // 2. FETCH INICIAL (/api/dashboard)
+    // =========================================================================
+    const loadInitialDashboard = async () => {
+      try {
+        logEvent('Carregando estado consolidado via /api/dashboard...');
+        const resp = await fetch('/api/dashboard');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const result = await resp.json();
+        applyDashboardData(result.data || result);
+        logEvent('Estado operacional carregado com sucesso dos 4 quadrantes.', 'success');
+      } catch (err) {
+        logEvent(`Falha ao consultar /api/dashboard: ${err.message}`, 'error');
+      }
+    };
+
+    // =========================================================================
+    // 3. SSE STREAMING (/api/stream/metrics)
+    // =========================================================================
+    const initSSE = () => {
+      const sseStatusText = document.getElementById('sse-status-text');
+      const sseDot = document.getElementById('sse-dot');
+
+      logEvent('Estabelecendo canal Server-Sent Events (SSE) /api/stream/metrics...');
+      const eventSource = new EventSource('/api/stream/metrics');
+
+      eventSource.onopen = () => {
+        sseStatusText.textContent = 'SSE: Conectado (4s)';
+        sseDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        logEvent('Canal SSE sintonizado com telemetria contínua.', 'stream');
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          applyDashboardData(payload);
+          logEvent(`Telemetria SSE recebida: Saldo BRL ${formatBRL(payload.fluxo_caixa?.saldo_atual)} | Latência: ${payload.eficiencia_pipeline?.latencia_media_ms}ms`, 'stream');
+        } catch (e) {
+          console.error('Erro ao interpretar evento SSE:', e);
+        }
+      };
+
+      eventSource.onerror = () => {
+        sseStatusText.textContent = 'SSE: Reconectando...';
+        sseDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
+        logEvent('Desconexão temporária no canal SSE. Tentando restabelecer...', 'error');
+      };
+    };
+
+    // =========================================================================
+    // 4. UPLOAD ASSÍNCRONO DE EXTRATO (.OFX OU .CSV)
+    // =========================================================================
+    const initUploadHandler = () => {
+      const fileInput = document.getElementById('statement-file');
+      const fileLabel = document.getElementById('file-label');
+      const form = document.getElementById('upload-form');
+      const btnSubmit = document.getElementById('btn-submit');
+      const btnSpinner = document.getElementById('btn-spinner');
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+          fileLabel.textContent = fileInput.files[0].name;
+          fileLabel.classList.add('text-cyan-300', 'font-semibold');
+        } else {
+          fileLabel.textContent = 'Escolher .OFX/.CSV';
+          fileLabel.classList.remove('text-cyan-300', 'font-semibold');
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+          logEvent('Nenhum arquivo selecionado. Selecione um extrato .OFX ou .CSV.', 'error');
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Feedback visual de carregamento
+        btnSubmit.disabled = true;
+        btnSpinner.classList.remove('hidden');
+        logEvent(`Transmitindo extrato "${file.name}" para a esteira PicoClaw...`);
+
+        try {
+          const resp = await fetch('/api/statements/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await resp.json();
+
+          if (!resp.ok || data.status === 'error') {
+            throw new Error(data.mensagem || `Falha na requisição HTTP ${resp.status}`);
+          }
+
+          // Sucesso
+          const d = data.detalhes || {};
+          logEvent(`Extrato "${file.name}" classificado! Linhas: ${d.total_linhas || 0} | JEV: ${d.classificadas_jev || 0} (${d.taxa_automacao_jev_pct || 90}%) | RAG: ${d.desambiguadas_rag || 0}`, 'success');
+
+          // Limpa formulário
+          form.reset();
+          fileLabel.textContent = 'Escolher .OFX/.CSV';
+          fileLabel.classList.remove('text-cyan-300', 'font-semibold');
+
+          // Atualiza dados após processamento
+          loadInitialDashboard();
+
+        } catch (err) {
+          logEvent(`Erro no upload: ${err.message}`, 'error');
+        } finally {
+          btnSubmit.disabled = false;
+          btnSpinner.classList.add('hidden');
+        }
+      });
+    };
+
+    // =========================================================================
+    // INICIALIZAÇÃO NO DOMContentLoaded
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadInitialDashboard();
+      initSSE();
+      initUploadHandler();
+    });
+  </script>
+
+</body>
+</html>
