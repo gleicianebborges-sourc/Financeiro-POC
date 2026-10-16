@@ -80,8 +80,13 @@ class HybridClassificationPipelineService:
                         motor_usado = EngineType.RAG_LLM
 
                 except JevClientError as err:
-                    # Falha de rede ou timeout no OpenRouter: Fallback imediato e transparente para o RAG local
-                    logger.warning("Erro de rede JEV (%s). Acionando contingência via RAG local para ID=%s", err, tx.id)
+                    # Falha de rede, timeout ou resposta fora do contrato no OpenRouter: Fallback para o RAG local
+                    logger.warning("Falha no JEV (%s). Acionando contingência via RAG local para ID=%s", err, tx.id)
+                    output = await self.rag_service.disambiguate_and_classify(tx_dict)
+                    motor_usado = EngineType.RAG_LLM
+                except Exception as err:  # noqa: BLE001 - contingência defensiva do System 1
+                    # Qualquer falha não prevista no JEV não pode interromper a esteira: desvia para RAG
+                    logger.exception("Falha inesperada no JEV para ID=%s (%s). Acionando RAG.", tx.id, err)
                     output = await self.rag_service.disambiguate_and_classify(tx_dict)
                     motor_usado = EngineType.RAG_LLM
 
@@ -124,9 +129,20 @@ class HybridClassificationPipelineService:
         self,
         transactions: List[BankStatementTransaction]
     ) -> Tuple[List[TransactionClassificationOutput], List[ProcessedTransaction]]:
-        """Processamento paralelo e concorrente de lote de transações bancárias."""
+        """Processamento paralelo e concorrente de lote de transações bancárias.
+
+        Tolerância a falhas: uma transação com erro é registrada em log e descartada,
+        sem interromper o processamento das demais.
+        """
         tasks = [self.process_single_transaction(tx) for tx in transactions]
-        results = await asyncio.gather(*tasks)
-        outputs = [r[0] for r in results]
-        processed_list = [r[1] for r in results]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        outputs: List[TransactionClassificationOutput] = []
+        processed_list: List[ProcessedTransaction] = []
+        for tx, result in zip(transactions, results):
+            if isinstance(result, BaseException):
+                logger.error("Transação ID=%s falhou na esteira e foi descartada: %r", tx.id, result)
+                continue
+            outputs.append(result[0])
+            processed_list.append(result[1])
         return outputs, processed_list

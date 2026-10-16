@@ -210,7 +210,7 @@ class RAGService:
             valor=valor,
             tipo=tipo,
             contraparte=Counterparty(
-                identificador=digits if digits in (11, 14) else ("12345678901" if is_cpf else "12345678000195"),
+                identificador=digits if len(digits) in (11, 14) else ("12345678901" if is_cpf else "12345678000195"),
                 nome=nome_contraparte
             ),
             classificacao=ClassificationDetail(

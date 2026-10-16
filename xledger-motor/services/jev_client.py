@@ -6,6 +6,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Dict, Optional
 import httpx
+from pydantic import ValidationError
 
 from config.openrouter import openrouter_settings
 from models.schemas.transaction import (
@@ -81,7 +82,9 @@ class JevOpenRouterClient:
                     "role": "system",
                     "content": (
                         "Você é o motor discriminativo JEV do XLedger. "
-                        "Retorne a classificação tipada estrita conforme o schema JSON exigido."
+                        "Retorne APENAS um objeto JSON válido, sem texto adicional, "
+                        "aderente estritamente ao seguinte JSON Schema:\n"
+                        f"{self._output_schema_json()}"
                     )
                 },
                 {"role": "user", "content": user_content},
@@ -103,6 +106,12 @@ class JevOpenRouterClient:
                     raw_content = data["choices"][0]["message"]["content"]
                     return TransactionClassificationOutput.model_validate_json(raw_content)
 
+            except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
+                # Resposta fora do contrato (JSON malformado, schema divergente ou envelope inesperado).
+                # Com temperature=0 o erro tende a ser determinístico: não há ganho em retentar.
+                logger.error("Resposta inválida do OpenRouter JEV para ID=%s: %s", tx_dict.get("id"), exc)
+                raise JevClientError(f"Resposta inválida da API do OpenRouter: {exc}") from exc
+
             except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
                 last_exc = exc
                 logger.warning(
@@ -116,6 +125,11 @@ class JevOpenRouterClient:
 
         logger.error("Esgotadas as tentativas com OpenRouter JEV: %s. Propagando para desvio RAG.", last_exc)
         raise JevClientError(f"Indisponibilidade ou Timeout na API do OpenRouter: {last_exc}")
+
+    @staticmethod
+    def _output_schema_json() -> str:
+        """JSON Schema do contrato de saída enviado ao modelo para forçar aderência tipada."""
+        return json.dumps(TransactionClassificationOutput.model_json_schema(), ensure_ascii=False)
 
     def _simulate_fast_track_jev(self, tx_dict: Dict[str, Any]) -> TransactionClassificationOutput:
         """Simulação determinística do modelo JEV para testes locais e fallback de alta performance."""
@@ -159,7 +173,7 @@ class JevOpenRouterClient:
             valor=valor,
             tipo=tipo,
             contraparte=Counterparty(
-                identificador=digits if digits in (11, 14) else ("12345678901" if is_cpf else "12345678000195"),
+                identificador=digits if len(digits) in (11, 14) else ("12345678901" if is_cpf else "12345678000195"),
                 nome=str(tx_dict.get("nome_contraparte", "Contraparte Identificada"))
             ),
             classificacao=ClassificationDetail(

@@ -95,5 +95,112 @@ class TestHybridClassificationPipeline(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(processed.motor_utilizado, "RAG_LLM")
 
 
+class TestRegressionFixes(unittest.IsolatedAsyncioTestCase):
+    """Regressões: identificador da contraparte, contingência do JEV e tolerância a falhas do lote."""
+
+    async def asyncSetUp(self) -> None:
+        self.compliance = FiscalComplianceService()
+        self.rag = RAGService()
+
+    def _make_pipeline(self, jev: JevOpenRouterClient) -> HybridClassificationPipelineService:
+        return HybridClassificationPipelineService(
+            jev_client=jev,
+            rag_service=self.rag,
+            fiscal_compliance=self.compliance,
+            confidence_threshold=0.90,
+        )
+
+    @staticmethod
+    def _tx(entity_id: str, valor: str, desc: str, doc_id: str, nome: str) -> BankStatementTransaction:
+        return BankStatementTransaction(
+            entity_id=entity_id,
+            data=date(2026, 10, 5),
+            valor=Decimal(valor),
+            tipo="DEBITO",
+            descricao_bruta=desc,
+            documento="DOC",
+            canal="PIX",
+            identificador_contraparte=doc_id,
+            nome_contraparte=nome,
+        )
+
+    async def test_identificador_real_preservado(self) -> None:
+        """O CPF/CNPJ real deve ser mantido (antes era substituído por placeholder fixo)."""
+        pipeline = self._make_pipeline(JevOpenRouterClient(mock_mode=True))
+        out_cnpj, _ = await pipeline.process_single_transaction(
+            self._tx("TX-ID-01", "100.00", "TARIFA BANCARIA", "99888777000166", "Banco X")
+        )
+        out_cpf, _ = await pipeline.process_single_transaction(
+            self._tx("TX-ID-02", "1000.00", "DISTRIBUICAO DE LUCROS", "98765432100", "Mariana Rios")
+        )
+        self.assertEqual(out_cnpj.contraparte.identificador, "99888777000166")
+        self.assertEqual(out_cpf.contraparte.identificador, "98765432100")
+
+    async def test_acumuladores_separados_por_cpf(self) -> None:
+        """Sócios distintos não podem ter seus repasses somados no mesmo acumulador."""
+        pipeline = self._make_pipeline(JevOpenRouterClient(mock_mode=True))
+        await pipeline.process_single_transaction(
+            self._tx("TX-AC-01", "40000.00", "DISTRIBUICAO DE LUCROS", "12345678901", "Carlos Drummond")
+        )
+        out, _ = await pipeline.process_single_transaction(
+            self._tx("TX-AC-02", "40000.00", "DISTRIBUICAO DE LUCROS", "98765432100", "Mariana Rios")
+        )
+        self.assertEqual(self.compliance.get_acumulado_cpf("12345678901"), Decimal("40000.00"))
+        self.assertEqual(self.compliance.get_acumulado_cpf("98765432100"), Decimal("40000.00"))
+        # 40k por CPF está abaixo do teto de 50k: nenhuma retenção
+        self.assertEqual(out.fiscal_compliance.irrf_retido, Decimal("0.00"))
+
+    async def test_resposta_invalida_jev_aciona_rag(self) -> None:
+        """Resposta fora do schema vinda do OpenRouter deve desviar para o RAG sem quebrar."""
+        jev = JevOpenRouterClient(api_key="sk-or-v1-real-key", mock_mode=False, max_retries=1)
+
+        class _FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {"choices": [{"message": {"content": "{\"campo\": \"fora do schema\"}"}}]}
+
+        class _FakeClient:
+            def __init__(self, *args, **kwargs) -> None:
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc) -> None:
+                return None
+
+            async def post(self, *args, **kwargs):
+                return _FakeResponse()
+
+        from unittest.mock import patch
+        with patch("services.jev_client.httpx.AsyncClient", _FakeClient):
+            pipeline = self._make_pipeline(jev)
+            _, processed = await pipeline.process_single_transaction(
+                self._tx("TX-INV-01", "300.00", "TARIFA BANCARIA", "99888777000166", "Banco X")
+            )
+        self.assertEqual(processed.motor_utilizado, "RAG_LLM")
+
+    async def test_lote_tolera_falha_individual(self) -> None:
+        """Uma transação com erro não pode derrubar o processamento do lote inteiro."""
+        pipeline = self._make_pipeline(JevOpenRouterClient(mock_mode=True))
+        ok_tx = self._tx("TX-OK", "100.00", "TARIFA BANCARIA", "99888777000166", "Banco X")
+        bad_tx = self._tx("TX-BAD", "100.00", "TARIFA BANCARIA", "99888777000166", "Banco X")
+
+        original = pipeline.process_single_transaction
+
+        async def _flaky(tx):
+            if tx.id == "TX-BAD":
+                raise RuntimeError("falha simulada")
+            return await original(tx)
+
+        pipeline.process_single_transaction = _flaky  # type: ignore[method-assign]
+        outputs, processed = await pipeline.process_batch([ok_tx, bad_tx])
+
+        self.assertEqual(len(processed), 1)
+        self.assertEqual(processed[0].id, "TX-OK")
+
+
 if __name__ == "__main__":
     unittest.main()
